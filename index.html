@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Jardim das Metas - Firebase</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    max-width: 1100px;  /* um pouco maior para a largura das caixas */
+    margin: 20px auto;
+    background: #f0f9f4;
+    color: #333;
+    display: flex;
+    gap: 20px;
+  }
+  main {
+    flex: 1;
+  }
+  h1 {
+    text-align: center;
+    margin-bottom: 10px;
+  }
+  .date-control {
+    text-align: center;
+    margin-bottom: 20px;
+    user-select: none;
+  }
+  .date-control button {
+    padding: 5px 10px;
+    margin: 0 10px;
+    font-weight: bold;
+    border-radius: 5px;
+    border: none;
+    background: #4CAF50;
+    color: white;
+    cursor: pointer;
+  }
+  .date-control button:hover {
+    background: #45a049;
+  }
+  .date-display {
+    font-size: 1.2em;
+    font-weight: bold;
+    vertical-align: middle;
+  }
+  .person {
+    background: #d9f0dd;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 10px;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+  }
+  .name {
+    font-weight: bold;
+    font-size: 1.2em;
+    width: 100px;
+  }
+  .plant {
+    text-align: center;
+    width: 150px;
+  }
+  button.mark-btn {
+    margin-top: 8px;
+    padding: 6px 10px;
+    border: none;
+    background: #4CAF50;
+    color: white;
+    font-weight: bold;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  button.mark-btn:hover {
+    background: #45a049;
+  }
+  .counter {
+    margin-top: 5px;
+    font-size: 0.9em;
+  }
+
+  /* Estilo da caixinha lateral */
+  #weeklyInspiration {
+    width: 550px;  /* aumentei aqui */
+    background: #d9f0dd;
+    padding: 15px;
+    border-radius: 10px;
+    font-size: 1em;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    user-select: none;
+    box-shadow: 0 0 8px rgba(0,0,0,0.1);
+    height: fit-content;
+  }
+  #weeklyInspiration h2 {
+    margin-top: 0;
+    color: #2d662d;
+    font-size: 1.3em;
+    text-align: center;
+  }
+  .insp-item {
+    background: #c6e1c6;
+    padding: 12px;
+    border-radius: 6px;
+  }
+  .insp-item strong {
+    display: block;
+    margin-bottom: 5px;
+    color: #256725;
+  }
+  .empty-state {
+    color: #666;
+    font-style: italic;
+    text-align: center;
+  }
+
+  /* Caixa lateral: inspiração da semana passada com palmas */
+  #lastWeekInspiration {
+    width: 1000px; /* aumentei aqui também */
+    background: #d9f0dd;
+    padding: 15px;
+    border-radius: 10px;
+    font-size: 1em;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    user-select: none;
+    box-shadow: 0 0 8px rgba(0,0,0,0.1);
+    height: fit-content;
+    text-align: center;
+  }
+  #lastWeekInspiration h2 {
+    margin-top: 0;
+    color: #2d662d;
+    font-size: 1.3em;
+  }
+  #bestAtivacaoLastWeek {
+    font-weight: bold;
+    font-size: 1.2em;
+    margin-bottom: 10px;
+  }
+  .clap-section {
+    margin-bottom: 12px;
+  }
+  .clap-button {
+    background: #4CAF50;
+    border: none;
+    color: white;
+    font-size: 1.4em;
+    padding: 8px 14px;
+    border-radius: 50%;
+    cursor: pointer;
+    user-select: none;
+  }
+  .clap-count {
+    font-weight: bold;
+    margin-left: 10px;
+    font-size: 1.1em;
+    vertical-align: middle;
+  }
+</style>
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+</head>
+<body>
+  <main>
+    <h1>Jardim das Metas - Controle Diário</h1>
+    <div class="date-control">
+      <button id="prevDay">&lt;</button>
+      <span class="date-display" id="dateDisplay"></span>
+      <button id="nextDay">&gt;</button>
+    </div>
+    <div id="team"></div>
+  </main>
+
+  <!-- Caixinha lateral: Quem está mandando bem essa semana -->
+  <aside id="weeklyInspiration">
+    <h2>Quem está mandando bem essa semana</h2>
+    <div class="insp-item">
+      <strong>Mais ativações:</strong> <span id="bestAtivacao">—</span>
+    </div>
+    <div class="insp-item">
+      <strong>Mais DI:</strong> <span id="bestDI">—</span>
+    </div>
+    <div class="insp-item">
+      <strong>Mais TD:</strong> <span id="bestTD">—</span>
+    </div>
+  </aside>
+
+  <!-- Caixinha lateral: inspiração da semana passada com palmas -->
+  <aside id="lastWeekInspiration">
+    <h2>INSPIRAÇÃO DA SEMANA: 
+
+Quem mandou bem nas ativações semana passada 🏆</h2>
+    <div id="bestAtivacaoLastWeek">—</div>
+    <div class="clap-section">
+      <button class="clap-button" title="Bater palmas">👏</button>
+      <span class="clap-count" id="clapCount">0</span>
+    </div>
+  </aside>
+
+<script>
+  // Config Firebase
+  const firebaseConfig = {
+    apiKey: "AIzaSyAMVNZymaBWUtT_61RvGPla37f5VguOn4",
+    authDomain: "jardim-das-metas.firebaseapp.com",
+    databaseURL: "https://jardim-das-metas-default-rtdb.firebaseio.com",
+    projectId: "jardim-das-metas",
+    storageBucket: "jardim-das-metas.firebasestorage.app",
+    messagingSenderId: "984629717641",
+    appId: "1:984629717641:web:0f65bfe5ec395088be3458",
+    measurementId: "G-MX8F84FZ4Y"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const database = firebase.database();
+
+  // Pessoas e metas base
+  const people = ["Amanda", "Julia", "Mateus", "Nestor", "Thalita"];
+  const metas = { "DI": 3, "TD": 5, "Ativação": 1 };
+
+  function createPlant(name, type) {
+    return { name, type, growth: 0, maxGrowth: metas[type] };
+  }
+  function createPerson(name) {
+    return {
+      name,
+      plants: [
+        createPlant(name, "DI"),
+        createPlant(name, "TD"),
+        createPlant(name, "Ativação")
+      ]
+    };
+  }
+  const baseTeam = people.map(createPerson);
+
+  // Data e UI controle diário
+  let dayData = null;
+  let currentDate = new Date();
+  const dateDisplay = document.getElementById('dateDisplay');
+  const prevDayBtn = document.getElementById('prevDay');
+  const nextDayBtn = document.getElementById('nextDay');
+
+  function updateDateDisplay() {
+    const options = { year: 'numeric', month: '2-digit', day: '2-digit' };
+    dateDisplay.textContent = currentDate.toLocaleDateString('pt-BR', options);
+  }
+
+  function saveDayData() {
+    if (!dayData) return;
+    const key = formatDate(currentDate);
+    database.ref('progresso/' + key).set(dayData);
+  }
+
+  function loadDayData(date, callback) {
+    const key = formatDate(date);
+    database.ref('progresso/' + key).once('value').then(snapshot => {
+      const data = snapshot.val();
+      if (data) {
+        callback(data);
+      } else {
+        callback(JSON.parse(JSON.stringify(baseTeam)));
+      }
+    }).catch(() => {
+      callback(JSON.parse(JSON.stringify(baseTeam)));
+    });
+  }
+
+  function updateUI() {
+    const teamDiv = document.getElementById('team');
+    teamDiv.innerHTML = '';
+    dayData.forEach(person => {
+      const personDiv = document.createElement('div');
+      personDiv.className = 'person';
+
+      const nameDiv = document.createElement('div');
+      nameDiv.className = 'name';
+      nameDiv.textContent = person.name;
+      personDiv.appendChild(nameDiv);
+
+      person.plants.forEach(plant => {
+        const plantDiv = document.createElement('div');
+        plantDiv.className = 'plant';
+
+        const emojiDiv = document.createElement('div');
+        emojiDiv.style.fontSize = '48px';
+        emojiDiv.style.userSelect = 'none';
+        emojiDiv.textContent = getEmojiPlant(plant.growth);
+        plantDiv.appendChild(emojiDiv);
+
+        const counter = document.createElement('div');
+        counter.className = 'counter';
+        counter.textContent = `${plant.type}: ${plant.growth} / ${plant.maxGrowth}`;
+        plantDiv.appendChild(counter);
+
+        const btn = document.createElement('button');
+        btn.className = 'mark-btn';
+        btn.textContent = `Marcar ${plant.type}`;
+        btn.onclick = () => {
+          if (plant.growth < plant.maxGrowth) {
+            plant.growth++;
+          } else {
+            plant.growth = 0;
+          }
+          saveDayData();
+          updateUI();
+          updateWeeklyInspiration();
+          updateLastWeekInspiration();
+        };
+        plantDiv.appendChild(btn);
+
+        personDiv.appendChild(plantDiv);
+      });
+
+      teamDiv.appendChild(personDiv);
+    });
+  }
+
+  function getEmojiPlant(stage) {
+    const stages = [ "🌱", "🌿", "☘️", "🍀", "🌵", "🌳" ];
+    if (stage > 5) stage = 5;
+    return stages[stage];
+  }
+
+  prevDayBtn.onclick = () => {
+    currentDate.setDate(currentDate.getDate() - 1);
+    loadAndRenderDate();
+  };
+  nextDayBtn.onclick = () => {
+    currentDate.setDate(currentDate.getDate() + 1);
+    loadAndRenderDate();
+  };
+
+  function loadAndRenderDate() {
+    loadDayData(currentDate, (data) => {
+      dayData = data;
+      updateDateDisplay();
+      updateUI();
+      updateWeeklyInspiration();
+      updateLastWeekInspiration();
+    });
+  }
+
+  // === Inspiração da Semana ===
+
+  // Retorna o primeiro dia da semana (segunda-feira) para uma data dada
+  function getMonday(d) {
+    d = new Date(d);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    return new Date(d.setDate(diff));
+  }
+
+  // Soma o total de cada tipo de planta para intervalo de datas (inclusive)
+  async function sumDataBetween(startDate, endDate) {
+    let totals = {};
+    people.forEach(p => {
+      totals[p] = { "Ativação": 0, "DI": 0, "TD": 0 };
+    });
+
+    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+      const key = formatDate(d);
+      const snapshot = await database.ref('progresso/' + key).once('value');
+      const day = snapshot.val();
+      if (!day) continue;
+      day.forEach(person => {
+        if (!totals[person.name]) return;
+        person.plants.forEach(plant => {
+          totals[person.name][plant.type] += plant.growth;
+        });
+      });
+    }
+    return totals;
+  }
+
+  // Atualiza a caixinha da semana atual: quem está mandando bem
+  async function updateWeeklyInspiration() {
+    const monday = getMonday(new Date());
+    const friday = new Date(monday);
+    friday.setDate(friday.getDate() + 4);
+
+    const totals = await sumDataBetween(monday, friday);
+    if (!totals) return;
+
+    // Busca melhor de cada categoria que tenha > 0
+    const bestAtiv = Object.entries(totals)
+      .filter(([_, v]) => v.Ativação > 0)
+      .reduce((a,b) => a[1].Ativação > b[1].Ativação ? a : b, ["—",{Ativação: 0}]);
+    const bestDI = Object.entries(totals)
+      .filter(([_, v]) => v.DI > 0)
+      .reduce((a,b) => a[1].DI > b[1].DI ? a : b, ["—",{DI: 0}]);
+    const bestTD = Object.entries(totals)
+      .filter(([_, v]) => v.TD > 0)
+      .reduce((a,b) => a[1].TD > b[1].TD ? a : b, ["—",{TD: 0}]);
+
+    // Se ninguém bateu, mostra “—”
+    document.getElementById('bestAtivacao').textContent = bestAtiv[0] === "—" ? "—" : bestAtiv[0];
+    document.getElementById('bestDI').textContent = bestDI[0] === "—" ? "—" : bestDI[0];
+    document.getElementById('bestTD').textContent = bestTD[0] === "—" ? "—" : bestTD[0];
+  }
+
+  // Atualiza a caixinha da semana passada: inspiração da semana com botão palmas
+  let clapCount = 0;
+  let lastWinner = null;
+
+  async function updateLastWeekInspiration() {
+    const mondayThisWeek = getMonday(new Date());
+    const mondayLastWeek = new Date(mondayThisWeek);
+    mondayLastWeek.setDate(mondayLastWeek.getDate() - 7);
+    const fridayLastWeek = new Date(mondayLastWeek);
+    fridayLastWeek.setDate(fridayLastWeek.getDate() + 4);
+
+    const totals = await sumDataBetween(mondayLastWeek, fridayLastWeek);
+    if (!totals) return;
+
+    const bestAtiv = Object.entries(totals)
+      .filter(([_, v]) => v.Ativação > 0)
+      .reduce((a,b) => a[1].Ativação > b[1].Ativação ? a : b, ["—",{Ativação: 0}]);
+    const bestName = bestAtiv[0];
+    const bestCount = bestAtiv[1].Ativação;
+
+    const display = document.getElementById('bestAtivacaoLastWeek');
+    if (bestCount <= 0) {
+      display.textContent = "—";
+      lastWinner = null;
+      resetClaps();
+      return;
+    }
+    display.textContent = `${bestName} (${bestCount} ativações)`;
+
+    if (lastWinner !== bestName) {
+      lastWinner = bestName;
+      resetClaps();
+    }
+  }
+
+  // Botão palmas
+  const clapBtn = document.querySelector('.clap-button');
+  const clapCountSpan = document.getElementById('clapCount');
+
+  function resetClaps() {
+    clapCount = 0;
+    clapCountSpan.textContent = clapCount;
+  }
+
+  clapBtn.onclick = () => {
+    if (!lastWinner) {
+      alert('Ainda não tem um vencedor da semana passada para bater palmas!');
+      return;
+    }
+    clapCount++;
+    clapCountSpan.textContent = clapCount;
+  };
+
+  // Utilitário para formatar data YYYY-MM-DD
+  function formatDate(d) {
+    return d.toISOString().slice(0,10);
+  }
+
+  // Inicializa tudo
+  loadAndRenderDate();
+</script>
+</body>
+</html>
+
