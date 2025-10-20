@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Jardim das Metas - Firebase</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    max-width: 1100px;
+    margin: 20px auto;
+    background: #f0f9f4;
+    color: #333;
+    display: flex;
+    gap: 20px;
+  }
+  main { flex: 1; }
+  h1 { text-align: center; margin-bottom: 10px; }
+  .date-control { text-align: center; margin-bottom: 20px; user-select: none; }
+  .date-control button {
+    padding: 5px 10px;
+    margin: 0 10px;
+    font-weight: bold;
+    border-radius: 5px;
+    border: none;
+    background: #4CAF50;
+    color: white;
+    cursor: pointer;
+  }
+  .date-control button:hover { background: #45a049; }
+  .date-display { font-size: 1.2em; font-weight: bold; vertical-align: middle; }
+  .person { background: #d9f0dd; padding: 15px; margin-bottom: 20px; border-radius: 10px; display: flex; justify-content: space-around; align-items: center; }
+  .name { font-weight: bold; font-size: 1.2em; width: 100px; }
+  .plant { text-align: center; width: 160px; }
+  .mark-btn, .minus-btn {
+    margin-top: 8px;
+    padding: 6px 10px;
+    border: none;
+    font-weight: bold;
+    border-radius: 5px;
+    cursor: pointer;
+    color: white;
+    display: inline-block;
+    min-width: 30px;
+    text-align: center;
+  }
+  .mark-btn { background: #4CAF50; }
+  .minus-btn { background: #e74c3c; margin-left: 5px; }
+  .mark-btn:hover { background: #45a049; }
+  .minus-btn:hover { background: #c0392b; }
+  .counter { margin-top: 5px; font-size: 0.9em; }
+  #weeklyInspiration, #lastWeekInspiration {
+    background: #d9f0dd;
+    padding: 15px;
+    border-radius: 10px;
+    font-size: 1em;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    user-select: none;
+    box-shadow: 0 0 8px rgba(0,0,0,0.1);
+    height: fit-content;
+  }
+  #weeklyInspiration { width: 550px; }
+  #weeklyInspiration h2, #lastWeekInspiration h2 {
+    margin-top: 0;
+    color: #2d662d;
+    font-size: 1.3em;
+    text-align: center;
+  }
+  .insp-item { background: #c6e1c6; padding: 12px; border-radius: 6px; }
+  .insp-item strong { display: block; margin-bottom: 5px; color: #256725; }
+  #lastWeekInspiration { width: 1000px; text-align: center; }
+  #bestAtivacaoLastWeek { font-weight: bold; font-size: 1.2em; margin-bottom: 10px; }
+  .clap-section { margin-bottom: 12px; }
+  .clap-button {
+    background: #4CAF50;
+    border: none;
+    color: white;
+    font-size: 1.4em;
+    padding: 8px 14px;
+    border-radius: 50%;
+    cursor: pointer;
+    user-select: none;
+  }
+  .clap-count { font-weight: bold; margin-left: 10px; font-size: 1.1em; vertical-align: middle; }
+</style>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+</head>
+<body>
+<main>
+  <h1>Jardim das Metas - Controle Diário</h1>
+  <div class="date-control">
+    <button id="prevDay">&lt;</button>
+    <span class="date-display" id="dateDisplay"></span>
+    <button id="nextDay">&gt;</button>
+  </div>
+  <div id="team"></div>
+</main>
+
+<aside id="weeklyInspiration">
+  <h2>Quem está mandando bem essa semana</h2>
+  <div class="insp-item"><strong>Mais ativações:</strong> <span id="bestAtivacao">—</span></div>
+  <div class="insp-item"><strong>Mais DI:</strong> <span id="bestDI">—</span></div>
+  <div class="insp-item"><strong>Mais TD:</strong> <span id="bestTD">—</span></div>
+</aside>
+
+<aside id="lastWeekInspiration">
+  <h2>INSPIRAÇÃO DA SEMANA: Quem mandou bem na semana passada 🏆</h2>
+  <div id="bestAtivacaoLastWeek">—</div>
+  <div class="clap-section">
+    <button class="clap-button" title="Bater palmas">👏</button>
+    <span class="clap-count" id="clapCount">0</span>
+  </div>
+</aside>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAMVNZymaBWUtT_61RvGPla37f5VguOn4",
+  authDomain: "jardim-das-metas.firebaseapp.com",
+  databaseURL: "https://jardim-das-metas-default-rtdb.firebaseio.com",
+  projectId: "jardim-das-metas",
+  storageBucket: "jardim-das-metas.firebasestorage.app",
+  messagingSenderId: "984629717641",
+  appId: "1:984629717641:web:0f65bfe5ec395088be3458",
+  measurementId: "G-MX8F84FZ4Y"
+};
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+
+// --- Lista de pessoas atualizada ---
+const people = ["Amanda","Edson","Julia","Mateus","Thalita"];
+
+function createPlant(name,type){ return {name,type,growth:0}; }
+function createPerson(name){ return {name,plants:[createPlant(name,"DI"),createPlant(name,"TD"),createPlant(name,"Ativação")]}; }
+const baseTeam = people.map(createPerson);
+
+let dayData=null;
+let currentDate=new Date();
+const dateDisplay=document.getElementById('dateDisplay');
+
+function updateDateDisplay(){ 
+    dateDisplay.textContent = currentDate.toLocaleDateString('pt-BR',{year:'numeric',month:'2-digit',day:'2-digit'}); 
+}
+
+function saveDayData(){ if(!dayData)return; database.ref('progresso/'+formatDate(currentDate)).set(dayData); }
+
+function loadDayData(date,callback){
+  const key=formatDate(date);
+  database.ref('progresso/'+key).once('value').then(snapshot=>{
+    const data=snapshot.val();
+    callback(data?data:JSON.parse(JSON.stringify(baseTeam)));
+  }).catch(()=>callback(JSON.parse(JSON.stringify(baseTeam))));
+}
+
+function updateUI(){
+  const teamDiv=document.getElementById('team');
+  teamDiv.innerHTML='';
+  dayData.forEach(person=>{
+    const personDiv=document.createElement('div');
+    personDiv.className='person';
+    const nameDiv=document.createElement('div');
+    nameDiv.className='name';
+    nameDiv.textContent=person.name;
+    personDiv.appendChild(nameDiv);
+
+    person.plants.forEach(plant=>{
+      const plantDiv=document.createElement('div');
+      plantDiv.className='plant';
+
+      const emojiDiv=document.createElement('div');
+      emojiDiv.style.fontSize='48px';
+      emojiDiv.style.userSelect='none';
+      emojiDiv.textContent=getEmojiPlant(plant.growth);
+      plantDiv.appendChild(emojiDiv);
+
+      const counter=document.createElement('div');
+      counter.className='counter';
+      counter.textContent=`${plant.type}: ${plant.growth}`;
+      plantDiv.appendChild(counter);
+
+      const btnAdd = document.createElement('button');
+      btnAdd.className='mark-btn';
+      btnAdd.textContent='+';
+      btnAdd.onclick = () => { plant.growth++; saveDayData(); updateUI(); };
+      plantDiv.appendChild(btnAdd);
+
+      const btnMinus = document.createElement('button');
+      btnMinus.className='minus-btn';
+      btnMinus.textContent='-';
+      btnMinus.onclick = () => { if(plant.growth>0){ plant.growth--; saveDayData(); updateUI(); } };
+      plantDiv.appendChild(btnMinus);
+
+      personDiv.appendChild(plantDiv);
+    });
+
+    teamDiv.appendChild(personDiv);
+  });
+
+  updateWeeklyInspiration();
+  updateLastWeekInspiration();
+}
+
+function getEmojiPlant(stage){
+  const stages=["🌱","🌿","☘️","🍀","🌵","🌳"];
+  return stages[Math.min(stage,stages.length-1)];
+}
+
+document.getElementById('prevDay').onclick=()=>{ currentDate.setDate(currentDate.getDate()-1); loadAndRenderDate(); };
+document.getElementById('nextDay').onclick=()=>{ currentDate.setDate(currentDate.getDate()+1); loadAndRenderDate(); };
+
+function loadAndRenderDate(){ loadDayData(currentDate,data=>{ dayData=data; updateDateDisplay(); updateUI(); }); }
+
+function getCurrentTotals(){
+  let totals={};
+  dayData.forEach(person=>{
+    totals[person.name]={"Ativação":0,"DI":0,"TD":0};
+    person.plants.forEach(plant=>{ totals[person.name][plant.type]=plant.growth; });
+  });
+  return totals;
+}
+
+function getBest(totals,type){
+  const arr=Object.entries(totals);
+  if(arr.length===0) return null;
+  const best=arr.reduce((a,b)=>a[1][type]>b[1][type]?a:b);
+  return best[1][type]>0?best[0]:null;
+}
+
+function updateWeeklyInspiration(){
+  const totals=getCurrentTotals();
+  document.getElementById('bestAtivacao').textContent=getBest(totals,"Ativação")||"—";
+  document.getElementById('bestDI').textContent=getBest(totals,"DI")||"—";
+  document.getElementById('bestTD').textContent=getBest(totals,"TD")||"—";
+}
+
+// --- Semana passada corrigido ---
+let clapCount=0;
+let lastWinner=null;
+
+function getLastWeekRange() {
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const diffToLastMonday = dayOfWeek + 6;
+    const mondayLastWeek = new Date(today);
+    mondayLastWeek.setDate(today.getDate() - diffToLastMonday);
+    const saturdayLastWeek = new Date(mondayLastWeek);
+    saturdayLastWeek.setDate(mondayLastWeek.getDate() + 5);
+    return {mondayLastWeek, saturdayLastWeek};
+}
+
+async function updateLastWeekInspiration() {
+    const {mondayLastWeek, saturdayLastWeek} = getLastWeekRange();
+    let totals = {};
+    people.forEach(name => totals[name] = 0);
+
+    for(let d = new Date(mondayLastWeek); d <= saturdayLastWeek; d.setDate(d.getDate() + 1)) {
+        const key = formatDate(d);
+        const snapshot = await database.ref('progresso/' + key).once('value');
+        const day = snapshot.val();
+        if(!day) continue;
+
+        day.forEach(person => {
+            const personName = person.name;
+            if(!totals.hasOwnProperty(personName)) return;
+
+            const ativ = person.plants?.find(p => p.type === "Ativação");
+            if(ativ && !isNaN(ativ.growth)) {
+                totals[personName] += Number(ativ.growth);
+            }
+        });
+    }
+
+    const maxAtiv = Math.max(...Object.values(totals));
+    if(maxAtiv === 0){
+        document.getElementById('bestAtivacaoLastWeek').textContent = "—";
+        lastWinner = null;
+        resetClaps();
+        return;
+    }
+
+    const winners = Object.entries(totals)
+                          .filter(([name,val]) => val === maxAtiv)
+                          .map(([name]) => name);
+
+    document.getElementById('bestAtivacaoLastWeek').textContent = winners.join(", ") + ` (${maxAtiv} ativações)`;
+
+    if(!lastWinner || winners.join(",") !== lastWinner){
+        lastWinner = winners.join(",");
+        resetClaps();
+    }
+}
+
+// --- Claps ---
+const clapBtn=document.querySelector('.clap-button');
+const clapCountSpan=document.getElementById('clapCount');
+function resetClaps(){ clapCount=0; clapCountSpan.textContent=clapCount; }
+clapBtn.onclick=()=>{
+    if(!lastWinner){ alert('Ainda não há vencedor da semana passada!'); return; }
+    clapCount++;
+    clapCountSpan.textContent=clapCount;
+};
+
+function formatDate(d){ return d.toISOString().slice(0,10); }
+
+loadAndRenderDate();
+</script>
+</body>
+</html>
